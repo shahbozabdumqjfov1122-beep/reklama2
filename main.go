@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	// Tokenni o‘zingiznikiga almashtiring
 	const BOT_TOKEN = "8451386937:AAFatnFPs42izFlwiGjJip8Lb2crggA0jIk"
 
 	pref := tb.Settings{
@@ -24,19 +23,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Ruxsat berilgan chatlar (kanal yoki guruhlar)
+	// Ruxsat berilgan chatlar
 	allowedChats := map[int64]bool{
 		-1003056945596: true,
 	}
 
-	// Reklama aniqlash regex
+	// Reklama aniqlash regex va blacklist
 	linkRe := regexp.MustCompile(`(?i)(https?://|t\.me/|telegram\.me/|www\.)`)
 	atRe := regexp.MustCompile(`(?m)@[\w\d_]{5,}`)
-
 	blacklist := []string{"reklama", "advert", "sotiladi", "promo", "xiaomi", "telefon sotiladi", "shop"}
 
-	// Xabar kelganda ishlaydigan handler
-	bot.Handle(tb.OnText, func(c tb.Context) error {
+	// Reklama tekshiruvchi funksiyani tayyorlaymiz
+	checkAndDelete := func(c tb.Context) error {
 		m := c.Message()
 		if m == nil {
 			return nil
@@ -44,7 +42,6 @@ func main() {
 
 		chatID := m.Chat.ID
 		if !allowedChats[chatID] {
-			// Guruh ro‘yxatda bo‘lmasa, e’tibor bermaymiz
 			return nil
 		}
 
@@ -76,7 +73,6 @@ func main() {
 
 			status := member.Role
 			if status == tb.Creator || status == tb.Administrator {
-				log.Printf("Admin xabari: %s", m.Sender.Username)
 				return nil
 			}
 
@@ -86,7 +82,6 @@ func main() {
 				log.Printf("Reklama o‘chirildi: %s", text)
 			}
 
-			// Foydalanuvchini ogohlantirish (faqat username ishlatamiz)
 			var name string
 			if m.Sender.Username != "" {
 				name = "@" + m.Sender.Username
@@ -95,20 +90,20 @@ func main() {
 			}
 
 			warn := fmt.Sprintf(`
-			⚠️ %s!
+⚠️ %s!
 
-			<b>Diqqat!</b> Bu guruhda reklama, havola yoki sotuvga oid xabarlar yuborish taqiqlangan.
+<b>Diqqat!</b> Bu guruhda reklama, havola yoki sotuvga oid xabarlar yuborish taqiqlangan.
+`, name)
 
-			❌ Reklama, link, mention, yoki mahsulot/sotuv so‘zlari aniqlansa — xabar o‘chiriladi.
-			🔒 Takror holatda foydalanuvchi vaqtincha bloklanishi mumkin.
-
-				Iltimos, guruh qoidalariga amal qiling va tartibni saqlang. 🙏
-			`, name)
 			return c.Send(warn, tb.ModeHTML)
 		}
 
 		return nil
-	})
+	}
+
+	// Yangi xabarlar va edit qilingan xabarlar uchun handler
+	bot.Handle(tb.OnText, checkAndDelete)
+	bot.Handle(tb.OnEdited, checkAndDelete)
 
 	log.Println("🤖 Bot ishga tushdi...")
 	bot.Start()
